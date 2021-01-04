@@ -5,6 +5,7 @@ size = (1110, 725)
 screen = pygame.display.set_mode(size)
 pygame.display.set_caption('Морской бой')
 running = True
+ship_group = pygame.sprite.Group()
 
 
 def load_image(name, colorkey=None):
@@ -23,6 +24,8 @@ def load_image(name, colorkey=None):
     return image
 
 
+ship_image = [load_image('Однопалубный.png'), load_image('Двухпалубный.png'),
+              load_image('Трехпалубный.png'), load_image('Четырехпалубный.png')]
 fon = pygame.transform.scale(load_image('Море.png'), (1110, 725))
 screen.blit(fon, (0, 0))
 
@@ -52,13 +55,24 @@ class Board:
                                   (self.cell_size - 2, self.cell_size - 3)], )
 
 
+class Ships(pygame.sprite.Sprite):
+    def __init__(self, x, y, image):
+        super().__init__(ship_group)
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
 
 board = Board(10, 10)
 board.set_view(140, 90, 60)
+for i in range(4):
+    Ships(810, 360 - 90 * i, ship_image[i])
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+    ship_group.draw(screen)
     board.render()
     pygame.display.flip()
 pygame.quit()
