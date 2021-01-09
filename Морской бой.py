@@ -1,6 +1,5 @@
 import pygame
 import os
-import sys
 pygame.init()
 size = (1110, 725)
 screen = pygame.display.set_mode(size)
@@ -50,9 +49,10 @@ class Board:
                 pygame.draw.rect(self.surface, pygame.Color('#033F60'),
                                  [(self.left + i * self.cell_size, self.top + j * self.cell_size),
                                   (self.cell_size, self.cell_size)], 2)
-                pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
-                                 [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
-                                  (self.cell_size - 2, self.cell_size - 3)], )
+                if self.board[i][j] == 0:
+                    pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
+                                     [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
+                                      (self.cell_size - 2, self.cell_size - 3)], )
         text_coord = 160
         for word in words:
             string_rendered = font.render(word, True, pygame.Color('navy'))
@@ -74,7 +74,6 @@ class Board:
         name_rect.x = 60
         name_rect.y = 10
         self.surface.blit(name_rendered, name_rect)
-
 
 class Button:
     def create_button(self, surface, x, y, length, height, text):
@@ -123,6 +122,7 @@ class Ships(pygame.sprite.Sprite):
         self.ship_move = False
         self.ship_not_installed = True
         self.new_ship = None
+        self.sideways = True
 
     def render(self):
         if not self.ship_move:
@@ -142,8 +142,55 @@ class Ships(pygame.sprite.Sprite):
             self.corner_y = event.pos[1] - self.rect.y
             self.ship_move = True
         if event.type == pygame.MOUSEMOTION and self.ship_move:
+            self.ship_button = []
+            self.neighbors = set()
             self.rect.x = event.pos[0] - self.corner_x
             self.rect.y = event.pos[1] - self.corner_y
+            if self.rect.x > 81 and self.rect.x + self.rect.width < 801 \
+                    and self.rect.y > 31 and self.rect.y + self.rect.height < 751:
+                if self.rect.x < 141 and self.rect.y + self.rect.height > 691:
+                    if self.sideways:
+                        for i in range(self.rect.width // 60):
+                            self.ship_button.append((i, 9))
+                    else:
+                        for i in range(self.rect.height // 60):
+                            self.ship_button.append((0, -i + 9))
+                elif self.rect.y < 91 and self.rect.x + self.rect.width > 741:
+                    if self.sideways:
+                        for i in range(self.rect.width // 60):
+                            self.ship_button.append((9 - i, 0))
+                    else:
+                        for i in range(self.rect.height // 60):
+                            self.ship_button.append((9, i + 91))
+                elif self.rect.y < 91 or self.rect.x < 141:
+                    if self.sideways:
+                        for i in range(self.rect.width // 60):
+                            self.ship_button.append((i, 0))
+                    else:
+                        for i in range(self.rect.height // 60):
+                            self.ship_button.append((0, i))
+                else:
+                    if self.sideways:
+                        for i in range(self.rect.width // 60):
+                            self.ship_button.append(((self.rect.x - 140) // 60 + i, (self.rect.y - 90) // 60))
+                    else:
+                        for i in range(self.rect.height // 60):
+                            self.ship_button.append(((self.rect.x - 140) // 60, i + (self.rect.y - 90) // 60))
+                for cell in self.ship_button:
+                    if cell[0] > 0:
+                        if cell[1] > 0:
+                            self.neighbors.add((cell[0] - 1, cell[1] - 1))
+                            self.neighbors.add((cell[0], cell[1] - 1))
+                        self.neighbors.add((cell[0] - 1, cell[1]))
+                        if cell[1] < 9:
+                            self.neighbors.add((cell[0] - 1, cell[1] + 1))
+                            self.neighbors.add((cell[0], cell[1] + 1))
+                    if cell[0] < 9:
+                        if cell[1] > 0:
+                            self.neighbors.add((cell[0] + 1, cell[1] - 1))
+                        self.neighbors.add((cell[0] + 1, cell[1]))
+                        if cell[1] < 9:
+                            self.neighbors.add((cell[0] + 1, cell[1] + 1))
         if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
             if self.ship_not_installed:
                 self.new_ship.count = self.new_ship.count + 1
