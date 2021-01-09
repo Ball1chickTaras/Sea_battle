@@ -48,14 +48,14 @@ class Board:
         for i in range(self.width):
             for j in range(self.height):
                 pygame.draw.rect(self.surface, pygame.Color('#033F60'),
-                                 [(self.left + i * self.cell_size, self.top + j * self.cell_size),\
+                                 [(self.left + i * self.cell_size, self.top + j * self.cell_size),
                                   (self.cell_size, self.cell_size)], 2)
                 pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
-                                 [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),\
+                                 [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
                                   (self.cell_size - 2, self.cell_size - 3)], )
         text_coord = 160
         for word in words:
-            string_rendered = font.render(word, 3, pygame.Color('navy'))
+            string_rendered = font.render(word, True, pygame.Color('navy'))
             string_rect = string_rendered.get_rect()
             string_rect.x = text_coord
             text_coord += 60
@@ -63,13 +63,13 @@ class Board:
             self.surface.blit(string_rendered, string_rect)
         text_coord = 110
         for i in range(1, 11):
-            number_rendered = font.render(str(i), 1, pygame.Color('navy'))
+            number_rendered = font.render(str(i), True, pygame.Color('navy'))
             number_rect = number_rendered.get_rect()
             number_rect.y = text_coord
             text_coord += 60
             number_rect.x = 125 - number_rect.width
             self.surface.blit(number_rendered, number_rect)
-        name_rendered = font.render(self.name, 1, pygame.Color('navy'))
+        name_rendered = font.render(self.name, True, pygame.Color('navy'))
         name_rect = name_rendered.get_rect()
         name_rect.x = 60
         name_rect.y = 10
@@ -109,34 +109,64 @@ class Button:
 
 
 class Ships(pygame.sprite.Sprite):
-    def __init__(self, x, y, image, count, surface):
+    def __init__(self, x, y, image, count, surface, next_ship):
         super().__init__(ship_group)
         self.image = image
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.count = 4 - count
+        self.count = count
         self.surface = surface
-        self.render()
+        self.next_ship = next_ship
+        self.corner_x = 0
+        self.corner_y = 0
+        self.ship_move = False
+        self.ship_not_installed = True
+        self.new_ship = None
 
     def render(self):
-        count_rendered = font.render(str(self.count), 3, pygame.Color('navy'))
-        intro_rect = count_rendered.get_rect()
-        intro_rect.y = self.rect.y + 30
-        intro_rect.x = self.rect.x + self.rect.width + 10
-        self.surface.blit(count_rendered, intro_rect)
+        if not self.ship_move:
+            count_rendered = font.render(str(self.count), True, pygame.Color('navy'))
+            intro_rect = count_rendered.get_rect()
+            intro_rect.y = self.rect.y + 30
+            intro_rect.x = self.rect.x + self.rect.width + 10
+            self.surface.blit(count_rendered, intro_rect)
+
+    def update(self):
+        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos) and self.count != 0\
+                and not self.next_ship:
+            self.count = self.count - 1
+            self.new_ship = Ships(self.rect.x, self.rect.y, self.image, self.count, screen, True)
+            self.next_ship = True
+            self.corner_x = event.pos[0] - self.rect.x
+            self.corner_y = event.pos[1] - self.rect.y
+            self.ship_move = True
+        if event.type == pygame.MOUSEMOTION and self.ship_move:
+            self.rect.x = event.pos[0] - self.corner_x
+            self.rect.y = event.pos[1] - self.corner_y
+        if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
+            if self.ship_not_installed:
+                self.new_ship.count = self.new_ship.count + 1
+                self.new_ship.next_ship = False
+                self.ship_move = False
+                self.kill()
+        self.render()
 
 
-button = Button()
+auto_button = Button()
+next_screen_button = Button()
 board = Board('Игрок1', screen)
 for i in range(4):
-    Ships(810, 360 - 90 * i, ship_image[i], i, screen)
+    Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
-    ship_group.draw(screen)
+    screen.blit(fon, (0, 0))
+    auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
+    next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
+    ship_group.update()
     board.render()
+    ship_group.draw(screen)
     pygame.display.flip()
 pygame.quit()
