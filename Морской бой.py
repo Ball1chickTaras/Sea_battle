@@ -75,6 +75,21 @@ class Board:
         name_rect.y = 10
         self.surface.blit(name_rendered, name_rect)
 
+    def update(self, cells, ship_buttons):
+        ship_can_be_installed = True
+        color = pygame.Color('green4')
+        for checking in cells:
+            if self.board[checking[0]][checking[1]] != 0:
+                color = pygame.Color('red3')
+                ship_can_be_installed = False
+        for cell in cells:
+            if cell not in ship_buttons and self.board[cell[0]][cell[1]] == 0:
+                pygame.draw.rect(self.surface, color,
+                                 [(self.left + cell[0] * self.cell_size + 2, self.top + cell[1] * self.cell_size + 2),
+                                  (self.cell_size - 2, self.cell_size - 3)], )
+        return ship_can_be_installed
+
+
 class Button:
     def create_button(self, surface, x, y, length, height, text):
         surface = self.draw_button(surface, pygame.Color('#EC9F3B'), length, height, x, y)
@@ -120,7 +135,7 @@ class Ships(pygame.sprite.Sprite):
         self.corner_x = 0
         self.corner_y = 0
         self.ship_move = False
-        self.ship_not_installed = True
+        self.ship_can_be_installed = False
         self.new_ship = None
         self.sideways = True
 
@@ -132,6 +147,19 @@ class Ships(pygame.sprite.Sprite):
             intro_rect.x = self.rect.x + self.rect.width + 10
             self.surface.blit(count_rendered, intro_rect)
 
+    def rotate(self):
+        if self.ship_move:
+            if self.sideways:
+                self.sideways = False
+                self.image = pygame.transform.rotate(self.image, 90)
+            else:
+                self.sideways = True
+                self.image = pygame.transform.rotate(self.image, -90)
+            self.rect = self.image.get_rect()
+            self.corner_x, self.corner_y = self.corner_y, self.corner_x
+            self.rect.x = self.event_pos_x - self.corner_x
+            self.rect.y = self.event_pos_y - self.corner_y
+
     def update(self):
         if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(event.pos) and self.count != 0\
                 and not self.next_ship:
@@ -142,61 +170,73 @@ class Ships(pygame.sprite.Sprite):
             self.corner_y = event.pos[1] - self.rect.y
             self.ship_move = True
         if event.type == pygame.MOUSEMOTION and self.ship_move:
+            self.ship_can_be_installed = False
+            self.event_pos_x = event.pos[0]
+            self.event_pos_y = event.pos[1]
             self.ship_button = []
             self.neighbors = set()
             self.rect.x = event.pos[0] - self.corner_x
             self.rect.y = event.pos[1] - self.corner_y
-            if self.rect.x > 81 and self.rect.x + self.rect.width < 801 \
-                    and self.rect.y > 31 and self.rect.y + self.rect.height < 751:
-                if self.rect.x < 141 and self.rect.y + self.rect.height > 691:
+            if self.rect.x > 80 and self.rect.x + self.rect.width < 800 \
+                    and self.rect.y > 30 and self.rect.y + self.rect.height < 750:
+                if self.rect.y < 90:
                     if self.sideways:
-                        for i in range(self.rect.width // 60):
-                            self.ship_button.append((i, 9))
+                        if self.rect.x > 140:
+                            for i in range(self.rect.width // 60):
+                                self.ship_button.append(((self.rect.x - 140) // 60 + i, 0))
+                        else:
+                            for i in range(self.rect.width // 60):
+                                self.ship_button.append((i, 0))
                     else:
-                        for i in range(self.rect.height // 60):
-                            self.ship_button.append((0, -i + 9))
-                elif self.rect.y < 91 and self.rect.x + self.rect.width > 741:
-                    if self.sideways:
-                        for i in range(self.rect.width // 60):
-                            self.ship_button.append((9 - i, 0))
-                    else:
-                        for i in range(self.rect.height // 60):
-                            self.ship_button.append((9, i + 91))
-                elif self.rect.y < 91 or self.rect.x < 141:
-                    if self.sideways:
-                        for i in range(self.rect.width // 60):
-                            self.ship_button.append((i, 0))
-                    else:
-                        for i in range(self.rect.height // 60):
-                            self.ship_button.append((0, i))
+                        if self.rect.x > 140:
+                            for i in range(self.rect.height // 60):
+                                self.ship_button.append(((self.rect.x - 140) // 60, i))
+                        else:
+                            for i in range(self.rect.height // 60):
+                                self.ship_button.append((0, i))
                 else:
                     if self.sideways:
-                        for i in range(self.rect.width // 60):
-                            self.ship_button.append(((self.rect.x - 140) // 60 + i, (self.rect.y - 90) // 60))
+                        if self.rect.x > 140:
+                            for i in range(self.rect.width // 60):
+                                self.ship_button.append(((self.rect.x - 140) // 60 + i,
+                                                         (self.rect.y - 90) // 60))
+                        else:
+                            for i in range(self.rect.width // 60):
+                                self.ship_button.append((i, (self.rect.y - 90) // 60))
                     else:
-                        for i in range(self.rect.height // 60):
-                            self.ship_button.append(((self.rect.x - 140) // 60, i + (self.rect.y - 90) // 60))
+                        if self.rect.x > 140:
+                            for i in range(self.rect.height // 60):
+                                self.ship_button.append(((self.rect.x - 140) // 60,
+                                                         (self.rect.y - 90) // 60 + i))
+                        else:
+                            for i in range(self.rect.height // 60):
+                                self.ship_button.append((0, (self.rect.y - 90) // 60 + i))
                 for cell in self.ship_button:
                     if cell[0] > 0:
                         if cell[1] > 0:
                             self.neighbors.add((cell[0] - 1, cell[1] - 1))
-                            self.neighbors.add((cell[0], cell[1] - 1))
                         self.neighbors.add((cell[0] - 1, cell[1]))
                         if cell[1] < 9:
                             self.neighbors.add((cell[0] - 1, cell[1] + 1))
-                            self.neighbors.add((cell[0], cell[1] + 1))
+                    if cell[1] > 0:
+                        self.neighbors.add((cell[0], cell[1] - 1))
+                    if cell[1] < 9:
+                        self.neighbors.add((cell[0], cell[1] + 1))
                     if cell[0] < 9:
                         if cell[1] > 0:
                             self.neighbors.add((cell[0] + 1, cell[1] - 1))
                         self.neighbors.add((cell[0] + 1, cell[1]))
                         if cell[1] < 9:
                             self.neighbors.add((cell[0] + 1, cell[1] + 1))
+                self.ship_can_be_installed = board.update(list(self.neighbors), self.ship_button)
         if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
-            if self.ship_not_installed:
+            if self.ship_can_be_installed:
+                for i in self.ship_button:
+                    board.board[i[0]][i[1]] = 1
+            else:
                 self.new_ship.count = self.new_ship.count + 1
-                self.new_ship.next_ship = False
-                self.ship_move = False
-                self.kill()
+            self.new_ship.next_ship = False
+            self.kill()
         self.render()
 
 
@@ -209,11 +249,14 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            for sprite in ship_group.sprites():
+                sprite.rotate()
     screen.blit(fon, (0, 0))
     auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
     next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
-    ship_group.update()
     board.render()
+    ship_group.update()
     ship_group.draw(screen)
     pygame.display.flip()
 pygame.quit()
