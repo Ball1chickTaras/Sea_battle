@@ -1,5 +1,6 @@
 import pygame
 import os
+from random import randint, choice
 pygame.init()
 size = (1110, 725)
 screen = pygame.display.set_mode(size)
@@ -36,6 +37,7 @@ class Board:
         self.width = 10
         self.height = 10
         self.board = [[0] * 10 for _ in range(10)]
+        self.board_image = [[None, None, None] * 10 for _ in range(10)]
         self.left = 140
         self.top = 90
         self.cell_size = 60
@@ -49,10 +51,16 @@ class Board:
                 pygame.draw.rect(self.surface, pygame.Color('#033F60'),
                                  [(self.left + i * self.cell_size, self.top + j * self.cell_size),
                                   (self.cell_size, self.cell_size)], 2)
-                if self.board[i][j] == 0:
-                    pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
-                                     [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
-                                      (self.cell_size - 2, self.cell_size - 3)], )
+                pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
+                                 [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
+                                  (self.cell_size - 2, self.cell_size - 3)], )
+                if self.board[i][j] == 1:
+                    if self.board_image[i][j][1]:
+                        source_area = pygame.Rect((60 * self.board_image[i][j][2], 0), (60, 60))
+                    else:
+                        source_area = pygame.Rect((0, self.board_image[i][j][2] * 60), (60, 60))
+                    self.surface.blit(self.board_image[i][j][0],
+                                      (self.left + i * self.cell_size, self.top + j * self.cell_size), source_area)
         text_coord = 160
         for word in words:
             string_rendered = font.render(word, True, pygame.Color('navy'))
@@ -75,18 +83,81 @@ class Board:
         name_rect.y = 10
         self.surface.blit(name_rendered, name_rect)
 
-    def update(self, cells, ship_buttons):
+    def check_neighbors(self, ship_button):
+        neighbors = set()
+        for cell in ship_button:
+            if cell[0] > 0:
+                if cell[1] > 0:
+                    neighbors.add((cell[0] - 1, cell[1] - 1))
+                neighbors.add((cell[0] - 1, cell[1]))
+                if cell[1] < 9:
+                    neighbors.add((cell[0] - 1, cell[1] + 1))
+            if cell[1] > 0:
+                neighbors.add((cell[0], cell[1] - 1))
+            if cell[1] < 9:
+                neighbors.add((cell[0], cell[1] + 1))
+            if cell[0] < 9:
+                if cell[1] > 0:
+                    neighbors.add((cell[0] + 1, cell[1] - 1))
+                neighbors.add((cell[0] + 1, cell[1]))
+                if cell[1] < 9:
+                    neighbors.add((cell[0] + 1, cell[1] + 1))
+        return list(neighbors)
+
+    def automatic_placement(self):
+        sprites = ship_group.sprites()
+        sprites.reverse()
+        self.board = [[0] * 10 for _ in range(10)]
+        for ship in sprites:
+            for j in range((300 - ship.rect.width) // 60):
+                while True:
+                    side = choice((True, False))
+                    first_button = randint(0, 99)
+                    if (300 - ship.rect.width) // 60 != 4:
+                        if side:
+                            if first_button % 10 + ship.rect.width // 60 < 10:
+                                coord_ship = [(first_button % 10 + i, first_button // 10) for i in range(ship.rect.width // 60)]
+                                if self.update(self.check_neighbors(coord_ship), coord_ship, True):
+                                    position = 0
+                                    for cell in coord_ship:
+                                        self.board[cell[0]][cell[1]] = 1
+                                        board.board_image[cell[0]][cell[1]] = [ship.image, side, position]
+                                        position = position + 1
+                                    break
+                        else:
+                            if first_button // 10 + ship.rect.width // 60 < 10:
+                                coord_ship = [(first_button % 10, first_button // 10 + i) for i in range(ship.rect.width // 60)]
+                                if self.update(self.check_neighbors(coord_ship), coord_ship, True):
+                                    position = 0
+                                    for cell in coord_ship:
+                                        self.board[cell[0]][cell[1]] = 1
+                                        board.board_image[cell[0]][cell[1]] = [pygame.transform.rotate(ship.image, 90), side, position]
+                                        position = position + 1
+                                    break
+                    else:
+                        if self.update(self.check_neighbors([(first_button % 10, first_button // 10)]),
+                                       [(first_button % 10, first_button // 10)], True):
+                            self.board[first_button % 10][first_button // 10] = 1
+                            board.board_image[first_button % 10][first_button // 10] = \
+                                [ship.image, side, 0]
+                            break
+        for ship in sprites:
+            ship.count = 0
+
+    def update(self, cells, ship_buttons, auto_or_not):
         ship_can_be_installed = True
         color = pygame.Color('green4')
         for checking in cells:
             if self.board[checking[0]][checking[1]] != 0:
                 color = pygame.Color('red3')
                 ship_can_be_installed = False
-        for cell in cells:
-            if cell not in ship_buttons and self.board[cell[0]][cell[1]] == 0:
-                pygame.draw.rect(self.surface, color,
-                                 [(self.left + cell[0] * self.cell_size + 2, self.top + cell[1] * self.cell_size + 2),
-                                  (self.cell_size - 2, self.cell_size - 3)], )
+                break
+        if not auto_or_not:
+            for cell in cells:
+                if cell not in ship_buttons and self.board[cell[0]][cell[1]] == 0:
+                    pygame.draw.rect(self.surface, color,
+                                     [(self.left + cell[0] * self.cell_size + 2, self.top + cell[1] * self.cell_size + 2),
+                                      (self.cell_size - 2, self.cell_size - 3)], )
         return ship_can_be_installed
 
 
@@ -110,16 +181,10 @@ class Button:
         return surface
 
     def pressed(self, mouse):
-        if mouse[0] > self.rect.topleft[0]:
-            if mouse[1] > self.rect.topleft[1]:
-                if mouse[0] < self.rect.bottomright[0]:
-                    if mouse[1] < self.rect.bottomright[1]:
-                        print("Some button was pressed!")
-                        return True
-                    else: return False
-                else: return False
-            else: return False
-        else: return False
+        if self.rect.collidepoint(mouse[0], mouse[1]):
+            return True
+        else:
+            return False
 
 
 class Ships(pygame.sprite.Sprite):
@@ -211,28 +276,15 @@ class Ships(pygame.sprite.Sprite):
                         else:
                             for i in range(self.rect.height // 60):
                                 self.ship_button.append((0, (self.rect.y - 90) // 60 + i))
-                for cell in self.ship_button:
-                    if cell[0] > 0:
-                        if cell[1] > 0:
-                            self.neighbors.add((cell[0] - 1, cell[1] - 1))
-                        self.neighbors.add((cell[0] - 1, cell[1]))
-                        if cell[1] < 9:
-                            self.neighbors.add((cell[0] - 1, cell[1] + 1))
-                    if cell[1] > 0:
-                        self.neighbors.add((cell[0], cell[1] - 1))
-                    if cell[1] < 9:
-                        self.neighbors.add((cell[0], cell[1] + 1))
-                    if cell[0] < 9:
-                        if cell[1] > 0:
-                            self.neighbors.add((cell[0] + 1, cell[1] - 1))
-                        self.neighbors.add((cell[0] + 1, cell[1]))
-                        if cell[1] < 9:
-                            self.neighbors.add((cell[0] + 1, cell[1] + 1))
-                self.ship_can_be_installed = board.update(list(self.neighbors), self.ship_button)
+                self.ship_can_be_installed = board.update(board.check_neighbors(self.ship_button),
+                                                          self.ship_button, False)
         if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
+            position = 0
             if self.ship_can_be_installed:
                 for i in self.ship_button:
                     board.board[i[0]][i[1]] = 1
+                    board.board_image[i[0]][i[1]] = [self.image, self.sideways, position]
+                    position = position + 1
             else:
                 self.new_ship.count = self.new_ship.count + 1
             self.new_ship.next_ship = False
@@ -252,6 +304,8 @@ while running:
         if event.type == pygame.KEYDOWN:
             for sprite in ship_group.sprites():
                 sprite.rotate()
+        if event.type == pygame.MOUSEBUTTONDOWN and auto_button.pressed(event.pos):
+            board.automatic_placement()
     screen.blit(fon, (0, 0))
     auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
     next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
