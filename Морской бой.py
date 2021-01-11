@@ -160,6 +160,9 @@ class Board:
                                       (self.cell_size - 2, self.cell_size - 3)], )
         return ship_can_be_installed
 
+    def permution(self, pos):
+        pass
+
 
 class Button:
     def create_button(self, surface, x, y, length, height, text):
@@ -304,8 +307,11 @@ while running:
         if event.type == pygame.KEYDOWN:
             for sprite in ship_group.sprites():
                 sprite.rotate()
-        if event.type == pygame.MOUSEBUTTONDOWN and auto_button.pressed(event.pos):
-            board.automatic_placement()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if auto_button.pressed(event.pos):
+                board.automatic_placement()
+            elif event.pos[0] > 140 and event.pos[1] < 740 and event.pos[0] > 90 and event.pos[1] < 690:
+                board.permution(event.pos)
     screen.blit(fon, (0, 0))
     auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
     next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
