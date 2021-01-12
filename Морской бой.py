@@ -37,7 +37,7 @@ class Board:
         self.width = 10
         self.height = 10
         self.board = [[0] * 10 for _ in range(10)]
-        self.board_image = [[None, None, None] * 10 for _ in range(10)]
+        self.board_image = [[None, None, None, None] * 10 for _ in range(10)]
         self.left = 140
         self.top = 90
         self.cell_size = 60
@@ -102,6 +102,7 @@ class Board:
                 neighbors.add((cell[0] + 1, cell[1]))
                 if cell[1] < 9:
                     neighbors.add((cell[0] + 1, cell[1] + 1))
+            neighbors.add((cell[0], cell[1]))
         return list(neighbors)
 
     def automatic_placement(self):
@@ -121,7 +122,7 @@ class Board:
                                     position = 0
                                     for cell in coord_ship:
                                         self.board[cell[0]][cell[1]] = 1
-                                        board.board_image[cell[0]][cell[1]] = [ship.image, side, position]
+                                        board.board_image[cell[0]][cell[1]] = [ship.image, side, position, coord_ship]
                                         position = position + 1
                                     break
                         else:
@@ -131,7 +132,8 @@ class Board:
                                     position = 0
                                     for cell in coord_ship:
                                         self.board[cell[0]][cell[1]] = 1
-                                        board.board_image[cell[0]][cell[1]] = [pygame.transform.rotate(ship.image, 90), side, position]
+                                        board.board_image[cell[0]][cell[1]] = [pygame.transform.rotate(ship.image, 90),
+                                                                               side, position, coord_ship]
                                         position = position + 1
                                     break
                     else:
@@ -139,7 +141,7 @@ class Board:
                                        [(first_button % 10, first_button // 10)], True):
                             self.board[first_button % 10][first_button // 10] = 1
                             board.board_image[first_button % 10][first_button // 10] = \
-                                [ship.image, side, 0]
+                                [ship.image, side, 0, [(first_button % 10, first_button // 10)]]
                             break
         for ship in sprites:
             ship.count = 0
@@ -161,7 +163,20 @@ class Board:
         return ship_can_be_installed
 
     def permution(self, pos):
-        pass
+        pos_x_pressed = (pos[0] - 140) // 60
+        pos_y_pressed = (pos[1] - 90) // 60
+        if self.board[pos_x_pressed][pos_y_pressed] == 1:
+            pos_x_first = self.board_image[pos_x_pressed][pos_y_pressed][3][0][0] * 60 + 140
+            pos_y_first = self.board_image[pos_x_pressed][pos_y_pressed][3][0][1] * 60 + 90
+            rearranged = Ships(pos_x_first, pos_y_first, self.board_image[pos_x_pressed][pos_y_pressed][0], 0, screen, False)
+            rearranged.ship_move = True
+            rearranged.corner_x = pos[0] - pos_x_first
+            rearranged.corner_y = pos[1] - pos_y_first
+            rearranged.sideways = self.board_image[pos_x_pressed][pos_y_pressed][1]
+            rearranged.ship_can_be_installed = True
+            rearranged.ship_button = self.board_image[pos_x_pressed][pos_y_pressed][3]
+            for cell in self.board_image[pos_x_pressed][pos_y_pressed][3]:
+                self.board[cell[0]][cell[1]] = 0
 
 
 class Button:
@@ -283,14 +298,21 @@ class Ships(pygame.sprite.Sprite):
                                                           self.ship_button, False)
         if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
             position = 0
+            for sprite in ship_group.sprites():
+                if self.sideways:
+                    if sprite.rect.width == self.rect.width and sprite != self:
+                        this_ship_is_on_the_right = sprite
+                else:
+                    if sprite.rect.width == self.rect.height and sprite != self:
+                        this_ship_is_on_the_right = sprite
             if self.ship_can_be_installed:
                 for i in self.ship_button:
                     board.board[i[0]][i[1]] = 1
-                    board.board_image[i[0]][i[1]] = [self.image, self.sideways, position]
+                    board.board_image[i[0]][i[1]] = [self.image, self.sideways, position, self.ship_button]
                     position = position + 1
             else:
-                self.new_ship.count = self.new_ship.count + 1
-            self.new_ship.next_ship = False
+                this_ship_is_on_the_right.count = this_ship_is_on_the_right.count + 1
+            this_ship_is_on_the_right.next_ship = False
             self.kill()
         self.render()
 
@@ -310,7 +332,7 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             if auto_button.pressed(event.pos):
                 board.automatic_placement()
-            elif event.pos[0] > 140 and event.pos[1] < 740 and event.pos[0] > 90 and event.pos[1] < 690:
+            elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690:
                 board.permution(event.pos)
     screen.blit(fon, (0, 0))
     auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
