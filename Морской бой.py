@@ -181,7 +181,11 @@ class Board:
 
 class Button:
     def create_button(self, surface, x, y, length, height, text):
-        surface = self.draw_button(surface, pygame.Color('#EC9F3B'), length, height, x, y)
+        self.remaining_ships = [ship.count for ship in ship_group.sprites()]
+        if self.remaining_ships.count(0) != len(self.remaining_ships) and self == next_screen_button:
+            surface = self.draw_button(surface, pygame.Color('gray28'), length, height, x, y)
+        else:
+            surface = self.draw_button(surface, pygame.Color('#EC9F3B'), length, height, x, y)
         surface = self.write_text(surface, text, length, height, x, y)
         self.rect = pygame.Rect(x,y, length, height)
         return surface
@@ -320,6 +324,8 @@ class Ships(pygame.sprite.Sprite):
 auto_button = Button()
 next_screen_button = Button()
 board = Board('Игрок1', screen)
+first_board = []
+second_board = []
 for i in range(4):
     Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
 while running:
@@ -334,6 +340,18 @@ while running:
                 board.automatic_placement()
             elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690:
                 board.permution(event.pos)
+            elif next_screen_button.pressed(event.pos) and \
+                    next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships):
+                if not bool(first_board):
+                    first_board = board.board
+                    board.name = 'Игрок2'
+                else:
+                    second_board = board.board
+                board.board = [[0] * 10 for _ in range(10)]
+                board.board_image = [[None, None, None, None] * 10 for _ in range(10)]
+                for sprite in ship_group.sprites():
+                    sprite.count = (300 - sprite.rect.width) // 60
+
     screen.blit(fon, (0, 0))
     auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
     next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
