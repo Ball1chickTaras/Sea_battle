@@ -28,6 +28,8 @@ def load_image(name, colorkey=None):
 
 ship_image = [load_image('Однопалубный.png'), load_image('Двухпалубный.png'),
               load_image('Трехпалубный.png'), load_image('Четырехпалубный.png')]
+blown_up_ships = [load_image('Взорванный_однопалубник.png'), load_image('Взорванный_двухпалубник.png'),
+                  load_image('Взорванный_трехпалубник.png'), load_image('Взорванный_четырехпалубник.png')]
 fon = pygame.transform.scale(load_image('Море.png'), (1110, 725))
 screen.blit(fon, (0, 0))
 
@@ -48,20 +50,23 @@ class Board:
         words = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
         for i in range(self.width):
             for j in range(self.height):
-                pygame.draw.rect(self.surface, pygame.Color('#033F60'),
-                                 [(self.left + i * self.cell_size, self.top + j * self.cell_size),
-                                  (self.cell_size, self.cell_size)], 2)
-                pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
-                                 [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
-                                  (self.cell_size - 2, self.cell_size - 3)], )
-                if self.board[i][j] == 1:
-                    if self.board_image[i][j][1]:
-                        source_area = pygame.Rect((60 * self.board_image[i][j][2], 0), (60, 60))
-                    else:
-                        source_area = pygame.Rect((0, self.board_image[i][j][2] * 60), (60, 60))
-                    self.surface.blit(self.board_image[i][j][0],
-                                      (self.left + i * self.cell_size, self.top + j * self.cell_size), source_area)
-        text_coord = 160
+                if self.board[i][j] != 2:
+                    pygame.draw.rect(self.surface, pygame.Color('#033F60'),
+                                     [(self.left + i * self.cell_size, self.top + j * self.cell_size),
+                                      (self.cell_size, self.cell_size)], 2)
+                    pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
+                                     [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
+                                      (self.cell_size - 2, self.cell_size - 3)], )
+                    if (self.board[i][j] == 1 and self != second_board_on_war and self != first_board_on_war) or\
+                            self.board[i][j] == 3:
+                        if self.board_image[i][j][1]:
+                            source_area = pygame.Rect((60 * self.board_image[i][j][2], 0), (60, 60))
+                        else:
+                            source_area = pygame.Rect((0, self.board_image[i][j][2] * 60), (60, 60))
+                        self.surface.blit(self.board_image[i][j][0],
+                                          (self.left + i * self.cell_size, self.top + j * self.cell_size), source_area)
+
+        text_coord = self.left + 20
         for word in words:
             string_rendered = font.render(word, True, pygame.Color('navy'))
             string_rect = string_rendered.get_rect()
@@ -69,18 +74,21 @@ class Board:
             text_coord += 60
             string_rect.y = 50
             self.surface.blit(string_rendered, string_rect)
-        text_coord = 110
+        text_coord = self.top + 20
         for i in range(1, 11):
             number_rendered = font.render(str(i), True, pygame.Color('navy'))
             number_rect = number_rendered.get_rect()
             number_rect.y = text_coord
             text_coord += 60
-            number_rect.x = 125 - number_rect.width
+            if self != second_board_on_war:
+                number_rect.x = 125 - number_rect.width
+            else:
+                number_rect.x = 1475
             self.surface.blit(number_rendered, number_rect)
         name_rendered = font.render(self.name, True, pygame.Color('navy'))
         name_rect = name_rendered.get_rect()
-        name_rect.x = 60
-        name_rect.y = 10
+        name_rect.x = self.left - 50
+        name_rect.y = self.top - 80
         self.surface.blit(name_rendered, name_rect)
 
     def check_neighbors(self, ship_button):
@@ -177,6 +185,19 @@ class Board:
             rearranged.ship_button = self.board_image[pos_x_pressed][pos_y_pressed][3]
             for cell in self.board_image[pos_x_pressed][pos_y_pressed][3]:
                 self.board[cell[0]][cell[1]] = 0
+
+    def fire(self, pos):
+        pos_x_pressed = (pos[0] - self.left) // 60
+        pos_y_pressed = (pos[1] - self.top) // 60
+        print(pos_x_pressed, pos_y_pressed)
+        if self.board[pos_x_pressed][pos_y_pressed] == 0:
+            self.board[pos_x_pressed][pos_y_pressed] = 2
+            return (True, False)
+        elif self.board[pos_x_pressed][pos_y_pressed] == 1:
+            self.board[pos_x_pressed][pos_y_pressed] = 3
+            return (True, True)
+        else:
+            return (False, False)
 
 
 class Button:
@@ -323,9 +344,12 @@ class Ships(pygame.sprite.Sprite):
 
 auto_button = Button()
 next_screen_button = Button()
+first_board_on_war = Board('Игрок1', screen)
+second_board_on_war = Board('Игрок2', screen)
 board = Board('Игрок1', screen)
 first_board = []
 second_board = []
+first_player_goes = choice((True, False))
 for i in range(4):
     Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
 while running:
@@ -335,28 +359,65 @@ while running:
         if event.type == pygame.KEYDOWN:
             for sprite in ship_group.sprites():
                 sprite.rotate()
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if auto_button.pressed(event.pos):
                 board.automatic_placement()
-            elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690:
+            elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690 and\
+                    (not bool(first_board) or not bool(second_board)):
                 board.permution(event.pos)
             elif next_screen_button.pressed(event.pos) and \
                     next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships):
                 if not bool(first_board):
                     first_board = board.board
+                    first_board_image = board.board_image
+                    print(first_board_image)
+                    for i in range(10):
+                        for j in range(10):
+                            if first_board_image[i][j] is not None:
+                                if first_board_image[i][j][1]:
+                                    first_board_image[i][j][0] = blown_up_ships[len(first_board_image[i][j][3]) - 1]
+                                else:
+                                    first_board_image[i][j][0] = \
+                                        pygame.transform.rotate(blown_up_ships[len(first_board_image[i][j][3]) - 1], 90)
                     board.name = 'Игрок2'
                 else:
                     second_board = board.board
+                    second_board_image = board.board_image
+                    for i in range(10):
+                        for j in range(10):
+                            if second_board_image[i][j] is not None:
+                                if second_board_image[i][j][1]:
+                                    second_board_image[i][j][0] = blown_up_ships[len(second_board_image[i][j][3]) - 1]
+                                else:
+                                    second_board_image[i][j][0] = pygame.transform.rotate\
+                                        (blown_up_ships[len(second_board_image[i][j][3]) - 1], 90)
+                    second_board_on_war.board = second_board
+                    second_board_on_war.board_image = second_board_image
+                    first_board_on_war.board = first_board
+                    first_board_on_war.board_image = first_board_image
+                    screen = pygame.display.set_mode((1527, 801))
+                    fon = pygame.transform.scale(load_image('Море.png'), (1527, 801))
+                    second_board_on_war.left = 860
                 board.board = [[0] * 10 for _ in range(10)]
                 board.board_image = [[None, None, None, None] * 10 for _ in range(10)]
                 for sprite in ship_group.sprites():
                     sprite.count = (300 - sprite.rect.width) // 60
-
+            elif bool(first_board) and bool(second_board):
+                if first_player_goes and 140 < event.pos[0] < 740 and 90 < event.pos[1] < 690:
+                    if first_board_on_war.fire(event.pos)[0] and not first_board_on_war.fire(event.pos)[1]:
+                        first_player_goes = False
+                if not first_player_goes and 860 < event.pos[0] < 1460 and 90 < event.pos[1] < 690:
+                    if second_board_on_war.fire(event.pos)[0] and not second_board_on_war.fire(event.pos)[1]:
+                        first_player_goes = True
     screen.blit(fon, (0, 0))
-    auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
-    next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
-    board.render()
-    ship_group.update()
-    ship_group.draw(screen)
+    if not bool(first_board) or not bool(second_board):
+        auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
+        next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
+        board.render()
+        ship_group.update()
+        ship_group.draw(screen)
+    else:
+        first_board_on_war.render()
+        second_board_on_war.render()
     pygame.display.flip()
 pygame.quit()
