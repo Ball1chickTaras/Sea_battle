@@ -39,7 +39,7 @@ class Board:
         self.width = 10
         self.height = 10
         self.board = [[0] * 10 for _ in range(10)]
-        self.board_image = [[None, None, None, None] * 10 for _ in range(10)]
+        self.board_image = [[None, None, None, None, None] * 10 for _ in range(10)]
         self.left = 140
         self.top = 90
         self.cell_size = 60
@@ -51,14 +51,19 @@ class Board:
         for i in range(self.width):
             for j in range(self.height):
                 if self.board[i][j] != 2:
-                    pygame.draw.rect(self.surface, pygame.Color('#033F60'),
-                                     [(self.left + i * self.cell_size, self.top + j * self.cell_size),
-                                      (self.cell_size, self.cell_size)], 2)
-                    pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
-                                     [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
-                                      (self.cell_size - 2, self.cell_size - 3)], )
+                    if self.board[i][j] == 3:
+                        pygame.draw.rect(self.surface, pygame.Color('#A60000'),
+                                         [(self.left + i * self.cell_size, self.top + j * self.cell_size),
+                                          (self.cell_size, self.cell_size)], )
+                    elif self.board[i][j] == 0 or self.board[i][j] == 1:
+                        pygame.draw.rect(self.surface, pygame.Color('#F3B770'),
+                                         [(self.left + i * self.cell_size + 2, self.top + j * self.cell_size + 2),
+                                          (self.cell_size - 2, self.cell_size - 3)], )
+                        pygame.draw.rect(self.surface, pygame.Color('#033F60'),
+                                            [(self.left + i * self.cell_size, self.top + j * self.cell_size),
+                                            (self.cell_size, self.cell_size)], 2)
                     if (self.board[i][j] == 1 and self != second_board_on_war and self != first_board_on_war) or\
-                            self.board[i][j] == 3:
+                            self.board[i][j] == 4:
                         if self.board_image[i][j][1]:
                             source_area = pygame.Rect((60 * self.board_image[i][j][2], 0), (60, 60))
                         else:
@@ -130,7 +135,8 @@ class Board:
                                     position = 0
                                     for cell in coord_ship:
                                         self.board[cell[0]][cell[1]] = 1
-                                        board.board_image[cell[0]][cell[1]] = [ship.image, side, position, coord_ship]
+                                        board.board_image[cell[0]][cell[1]] = [ship.image, side, position, coord_ship,
+                                                                               self.check_neighbors(coord_ship)]
                                         position = position + 1
                                     break
                         else:
@@ -141,7 +147,8 @@ class Board:
                                     for cell in coord_ship:
                                         self.board[cell[0]][cell[1]] = 1
                                         board.board_image[cell[0]][cell[1]] = [pygame.transform.rotate(ship.image, 90),
-                                                                               side, position, coord_ship]
+                                                                               side, position, coord_ship,
+                                                                               self.check_neighbors(coord_ship)]
                                         position = position + 1
                                     break
                     else:
@@ -149,12 +156,15 @@ class Board:
                                        [(first_button % 10, first_button // 10)], True):
                             self.board[first_button % 10][first_button // 10] = 1
                             board.board_image[first_button % 10][first_button // 10] = \
-                                [ship.image, side, 0, [(first_button % 10, first_button // 10)]]
+                                [ship.image, side, 0, [(first_button % 10, first_button // 10)],
+                                 self.check_neighbors([(first_button % 10, first_button // 10)])]
                             break
         for ship in sprites:
             ship.count = 0
 
     def update(self, cells, ship_buttons, auto_or_not):
+        if len(cells) == 1:
+            print(cells)
         ship_can_be_installed = True
         color = pygame.Color('green4')
         for checking in cells:
@@ -189,12 +199,18 @@ class Board:
     def fire(self, pos):
         pos_x_pressed = (pos[0] - self.left) // 60
         pos_y_pressed = (pos[1] - self.top) // 60
-        print(pos_x_pressed, pos_y_pressed)
         if self.board[pos_x_pressed][pos_y_pressed] == 0:
             self.board[pos_x_pressed][pos_y_pressed] = 2
             return (True, False)
         elif self.board[pos_x_pressed][pos_y_pressed] == 1:
             self.board[pos_x_pressed][pos_y_pressed] = 3
+            if [self.board[ship[0]][ship[1]] for ship in self.board_image[pos_x_pressed][pos_y_pressed][3]].count(3) ==\
+                    len(self.board_image[pos_x_pressed][pos_y_pressed][3]):
+                for ship in self.board_image[pos_x_pressed][pos_y_pressed][3]:
+                    self.board[ship[0]][ship[1]] = 4
+                for cell in self.board_image[pos_x_pressed][pos_y_pressed][4]:
+                    if self.board[cell[0]][cell[1]] != 4:
+                        self.board[cell[0]][cell[1]] = 2
             return (True, True)
         else:
             return (False, False)
@@ -203,12 +219,12 @@ class Board:
 class Button:
     def create_button(self, surface, x, y, length, height, text):
         self.remaining_ships = [ship.count for ship in ship_group.sprites()]
-        if self.remaining_ships.count(0) != len(self.remaining_ships) and self == next_screen_button:
+        if self.remaining_ships.count(0) != len(self.remaining_ships) and self == next_screen_button and not bool(second_board):
             surface = self.draw_button(surface, pygame.Color('gray28'), length, height, x, y)
         else:
             surface = self.draw_button(surface, pygame.Color('#EC9F3B'), length, height, x, y)
         surface = self.write_text(surface, text, length, height, x, y)
-        self.rect = pygame.Rect(x,y, length, height)
+        self.rect = pygame.Rect(x, y, length, height)
         return surface
 
     def write_text(self, surface, text,  length, height, x, y):
@@ -282,7 +298,6 @@ class Ships(pygame.sprite.Sprite):
             self.event_pos_x = event.pos[0]
             self.event_pos_y = event.pos[1]
             self.ship_button = []
-            self.neighbors = set()
             self.rect.x = event.pos[0] - self.corner_x
             self.rect.y = event.pos[1] - self.corner_y
             if self.rect.x > 80 and self.rect.x + self.rect.width < 800 \
@@ -319,7 +334,8 @@ class Ships(pygame.sprite.Sprite):
                         else:
                             for i in range(self.rect.height // 60):
                                 self.ship_button.append((0, (self.rect.y - 90) // 60 + i))
-                self.ship_can_be_installed = board.update(board.check_neighbors(self.ship_button),
+                self.neighbors = board.check_neighbors(self.ship_button)
+                self.ship_can_be_installed = board.update(self.neighbors,
                                                           self.ship_button, False)
         if event.type == pygame.MOUSEBUTTONUP and self.ship_move:
             position = 0
@@ -333,7 +349,7 @@ class Ships(pygame.sprite.Sprite):
             if self.ship_can_be_installed:
                 for i in self.ship_button:
                     board.board[i[0]][i[1]] = 1
-                    board.board_image[i[0]][i[1]] = [self.image, self.sideways, position, self.ship_button]
+                    board.board_image[i[0]][i[1]] = [self.image, self.sideways, position, self.ship_button, self.neighbors]
                     position = position + 1
             else:
                 this_ship_is_on_the_right.count = this_ship_is_on_the_right.count + 1
@@ -349,7 +365,12 @@ second_board_on_war = Board('Игрок2', screen)
 board = Board('Игрок1', screen)
 first_board = []
 second_board = []
+start_screen = True
+start_fon = pygame.transform.scale(load_image('Заставка.jpeg'), (1110, 725))
+arrow = pygame.transform.scale(load_image('Стрелочка.png'), (100, 60))
 first_player_goes = choice((True, False))
+if first_player_goes:
+    arrow = pygame.transform.flip(arrow, True, False)
 for i in range(4):
     Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
 while running:
@@ -359,18 +380,17 @@ while running:
         if event.type == pygame.KEYDOWN:
             for sprite in ship_group.sprites():
                 sprite.rotate()
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if auto_button.pressed(event.pos):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not start_screen:
+            if auto_button is not None and auto_button.pressed(event.pos):
                 board.automatic_placement()
             elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690 and\
                     (not bool(first_board) or not bool(second_board)):
                 board.permution(event.pos)
             elif next_screen_button.pressed(event.pos) and \
-                    next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships):
+                  (next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships) or bool(second_board)):
                 if not bool(first_board):
                     first_board = board.board
                     first_board_image = board.board_image
-                    print(first_board_image)
                     for i in range(10):
                         for j in range(10):
                             if first_board_image[i][j] is not None:
@@ -380,7 +400,7 @@ while running:
                                     first_board_image[i][j][0] = \
                                         pygame.transform.rotate(blown_up_ships[len(first_board_image[i][j][3]) - 1], 90)
                     board.name = 'Игрок2'
-                else:
+                elif not bool(second_board):
                     second_board = board.board
                     second_board_image = board.board_image
                     for i in range(10):
@@ -398,26 +418,50 @@ while running:
                     screen = pygame.display.set_mode((1527, 801))
                     fon = pygame.transform.scale(load_image('Море.png'), (1527, 801))
                     second_board_on_war.left = 860
+                    auto_button = None
+                else:
+                    first_board = []
+                    second_board = []
+                    screen = pygame.display.set_mode(size)
+                    fon = pygame.transform.scale(load_image('Море.png'), (1110, 725))
+                    ship_group = pygame.sprite.Group()
+                    for i in range(4):
+                        Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
+                    board = Board('Игрок1', screen)
+                    first_board_on_war = Board('Игрок1', screen)
+                    second_board_on_war = Board('Игрок2', screen)
+                    auto_button = Button()
                 board.board = [[0] * 10 for _ in range(10)]
                 board.board_image = [[None, None, None, None] * 10 for _ in range(10)]
                 for sprite in ship_group.sprites():
                     sprite.count = (300 - sprite.rect.width) // 60
             elif bool(first_board) and bool(second_board):
                 if first_player_goes and 140 < event.pos[0] < 740 and 90 < event.pos[1] < 690:
-                    if first_board_on_war.fire(event.pos)[0] and not first_board_on_war.fire(event.pos)[1]:
+                    result = first_board_on_war.fire(event.pos)
+                    if result[0] and not result[1]:
+                        arrow = pygame.transform.flip(arrow, True, False)
                         first_player_goes = False
                 if not first_player_goes and 860 < event.pos[0] < 1460 and 90 < event.pos[1] < 690:
-                    if second_board_on_war.fire(event.pos)[0] and not second_board_on_war.fire(event.pos)[1]:
+                    result = second_board_on_war.fire(event.pos)
+                    if result[0] and not result[1]:
+                        arrow = pygame.transform.flip(arrow, True, False)
                         first_player_goes = True
-    screen.blit(fon, (0, 0))
-    if not bool(first_board) or not bool(second_board):
-        auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
-        next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
-        board.render()
-        ship_group.update()
-        ship_group.draw(screen)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and start_screen:
+            start_screen = False
+    if start_screen:
+        screen.blit(start_fon, (0, 0))
     else:
-        first_board_on_war.render()
-        second_board_on_war.render()
+        screen.blit(fon, (0, 0))
+        if not bool(first_board) or not bool(second_board):
+            auto_button.create_button(screen, 810, 450, 281, 61, 'Авто расстановка')
+            next_screen_button.create_button(screen, 960, 640, 141, 51, '--->')
+            board.render()
+            ship_group.update()
+            ship_group.draw(screen)
+        else:
+            first_board_on_war.render()
+            second_board_on_war.render()
+            screen.blit(arrow, (750, 390))
+            next_screen_button.create_button(screen, 1150, 700, 300, 60, 'Перезапуск')
     pygame.display.flip()
 pygame.quit()
