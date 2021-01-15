@@ -8,6 +8,12 @@ pygame.display.set_caption('Морской бой')
 running = True
 ship_group = pygame.sprite.Group()
 font = pygame.font.Font(None, 40)
+end_game = (False, None)
+splash = pygame.mixer.Sound(os.path.join('data', 'Всплеск.wav'))
+breaking_through = pygame.mixer.Sound(os.path.join('data', 'Есть пробитие.mp3'))
+win = pygame.mixer.Sound(os.path.join('data', 'Победа.mp3'))
+pygame.mixer.music.load(os.path.join('data', 'Море.mp3'))
+pygame.mixer.music.play()
 
 
 def load_image(name, colorkey=None):
@@ -35,7 +41,7 @@ screen.blit(fon, (0, 0))
 
 
 class Board:
-    def __init__(self, name, surface):
+    def __init__(self, name, other_name, surface):
         self.width = 10
         self.height = 10
         self.board = [[0] * 10 for _ in range(10)]
@@ -44,7 +50,9 @@ class Board:
         self.top = 90
         self.cell_size = 60
         self.name = name
+        self.other_name = other_name
         self.surface = surface
+        self.ship_cell = [4 for _ in range(20)]
 
     def render(self):
         words = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
@@ -197,13 +205,20 @@ class Board:
                 self.board[cell[0]][cell[1]] = 0
 
     def fire(self, pos):
+        global end_game
         pos_x_pressed = (pos[0] - self.left) // 60
         pos_y_pressed = (pos[1] - self.top) // 60
         if self.board[pos_x_pressed][pos_y_pressed] == 0:
             self.board[pos_x_pressed][pos_y_pressed] = 2
+            splash.play()
             return (True, False)
         elif self.board[pos_x_pressed][pos_y_pressed] == 1:
             self.board[pos_x_pressed][pos_y_pressed] = 3
+            breaking_through.play()
+            self.ship_cell.pop()
+            if not bool(self.ship_cell):
+                end_game = (True, self.other_name)
+                win.play()
             if [self.board[ship[0]][ship[1]] for ship in self.board_image[pos_x_pressed][pos_y_pressed][3]].count(3) ==\
                     len(self.board_image[pos_x_pressed][pos_y_pressed][3]):
                 for ship in self.board_image[pos_x_pressed][pos_y_pressed][3]:
@@ -221,6 +236,8 @@ class Button:
         self.remaining_ships = [ship.count for ship in ship_group.sprites()]
         if self.remaining_ships.count(0) != len(self.remaining_ships) and self == next_screen_button and not bool(second_board):
             surface = self.draw_button(surface, pygame.Color('gray28'), length, height, x, y)
+        elif end_game[0]:
+            surface = self.draw_button(surface, pygame.Color('#4A0134'), length, height, x, y)
         else:
             surface = self.draw_button(surface, pygame.Color('#EC9F3B'), length, height, x, y)
         surface = self.write_text(surface, text, length, height, x, y)
@@ -236,7 +253,8 @@ class Button:
 
     def draw_button(self, surface, color, length, height, x, y):
         pygame.draw.rect(surface, color, (x, y, length, height), 0)
-        pygame.draw.rect(surface, pygame.Color('MediumPurple4'), (x, y, length, height), 3)
+        if not end_game[0]:
+            pygame.draw.rect(surface, pygame.Color('MediumPurple4'), (x, y, length, height), 3)
         return surface
 
     def pressed(self, mouse):
@@ -360,9 +378,10 @@ class Ships(pygame.sprite.Sprite):
 
 auto_button = Button()
 next_screen_button = Button()
-first_board_on_war = Board('Игрок1', screen)
-second_board_on_war = Board('Игрок2', screen)
-board = Board('Игрок1', screen)
+exit_button = Button()
+first_board_on_war = Board('Игрок1', 'Игрок2', screen)
+second_board_on_war = Board('Игрок2', 'Игрок1', screen)
+board = Board('Игрок1', 'Игрок2', screen)
 first_board = []
 second_board = []
 start_screen = True
@@ -386,8 +405,11 @@ while running:
             elif event.pos[0] > 140 and event.pos[0] < 740 and event.pos[1] > 90 and event.pos[1] < 690 and\
                     (not bool(first_board) or not bool(second_board)):
                 board.permution(event.pos)
+            elif end_game[0] and exit_button.pressed(event.pos):
+                running = False
             elif next_screen_button.pressed(event.pos) and \
-                  (next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships) or bool(second_board)):
+                  (next_screen_button.remaining_ships.count(0) == len(next_screen_button.remaining_ships) or
+                   bool(second_board) or end_game[0]):
                 if not bool(first_board):
                     first_board = board.board
                     first_board_image = board.board_image
@@ -427,10 +449,11 @@ while running:
                     ship_group = pygame.sprite.Group()
                     for i in range(4):
                         Ships(810, 360 - 90 * i, ship_image[i], 4 - i, screen, False)
-                    board = Board('Игрок1', screen)
-                    first_board_on_war = Board('Игрок1', screen)
-                    second_board_on_war = Board('Игрок2', screen)
+                    board = Board('Игрок1', 'Игрок2', screen)
+                    first_board_on_war = Board('Игрок1', 'Игрок2', screen)
+                    second_board_on_war = Board('Игрок2', 'Игрок1', screen)
                     auto_button = Button()
+                    end_game = (False, None)
                 board.board = [[0] * 10 for _ in range(10)]
                 board.board_image = [[None, None, None, None] * 10 for _ in range(10)]
                 for sprite in ship_group.sprites():
@@ -448,6 +471,13 @@ while running:
                         first_player_goes = True
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and start_screen:
             start_screen = False
+        if end_game[0]:
+            screen = pygame.display.set_mode(size)
+            fon = pygame.transform.scale(load_image('win.jpg'), (1110, 725))
+            font_size = int(300 // len(end_game[1]) * 1.5)
+            button_font = pygame.font.SysFont("Calibri", font_size)
+            text = button_font.render(end_game[1], True, pygame.Color(124, 46, 125))
+
     if start_screen:
         screen.blit(start_fon, (0, 0))
     else:
@@ -458,6 +488,10 @@ while running:
             board.render()
             ship_group.update()
             ship_group.draw(screen)
+        elif end_game[0]:
+            screen.blit(text, (size[0] // 2 - 100, 100))
+            exit_button.create_button(screen, 300, 550, 200, 60, 'Выход')
+            next_screen_button.create_button(screen, 600, 550, 200, 60, 'Перезапуск')
         else:
             first_board_on_war.render()
             second_board_on_war.render()
